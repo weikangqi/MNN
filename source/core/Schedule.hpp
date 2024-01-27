@@ -49,6 +49,7 @@ public:
 
         /**Command buffer for execute*/
         CommandBuffer executeBuffer;
+        CommandBuffer executeBuffer_backup;
         
         std::map<const Op*, std::shared_ptr<Execution>> executionCache;
     };

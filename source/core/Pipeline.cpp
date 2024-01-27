@@ -5,7 +5,7 @@
 //  Created by MNN on 2019/01/14.
 //  Copyright © 2018, Alibaba Group Holding Limited
 //
-
+#include "core/Singal.hpp"
 #include <string.h>
 #include "core/Pipeline.hpp"
 #include "core/Backend.hpp"
@@ -1021,7 +1021,12 @@ ErrorCode Pipeline::execute() {
 #endif
         for (auto& cmdP : buffer.command) {
             auto& cmd = *cmdP;
+
             auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
+            if（）
+            {
+                
+            }
 // #define LOG_VERPOSE
 #ifdef LOG_VERPOSE
             auto dumpT = [](Tensor* t) {
@@ -1059,6 +1064,29 @@ ErrorCode Pipeline::execute() {
     mBackend->onExecuteEnd();
     return NO_ERROR;
 }
+
+ErrorCode Pipeline::execute(syn_data &sysdata) {
+    _copyInputs();
+    auto& mBackend = mInfo.first.cache.first;
+    auto& mBackupBackend = mInfo.first.cache.second;
+    mBackend->onExecuteBegin();
+    for (auto& info : mInfo.second) {
+        auto& buffer = info.executeBuffer;
+
+        for (auto& cmdP : buffer.command) {
+            auto& cmd = *cmdP;
+            auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
+
+            if (NO_ERROR != code) {
+                mBackend->onExecuteEnd();
+                return code;
+            }
+        }
+    }
+    mBackend->onExecuteEnd();
+    return NO_ERROR;
+}
+
 
 ErrorCode Pipeline::executeCallBack(const TensorCallBackWithInfo& before, const TensorCallBackWithInfo& after) {
     _copyInputs();

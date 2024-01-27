@@ -12,7 +12,7 @@
 #include "Schedule.hpp"
 #include "core/Execution.hpp"
 #include "geometry/GeometryComputer.hpp"
-
+#include "core/Singal.hpp"
 namespace MNN {
 struct OperatorInfo::Info {
     std::string name;
@@ -47,6 +47,7 @@ public:
     ErrorCode allocMemory(bool firstMalloc, bool permitCodegen);
     /** execute this pipline */
     ErrorCode execute();
+    ErrorCode execute(syn_data &sysdata);
     ErrorCode executeCallBack(const TensorCallBackWithInfo& before, const TensorCallBackWithInfo& after);
     Schedule::PipelineInfo& getPipelineInfo() {
         return mInfo;

@@ -13,6 +13,7 @@
 #include <map>
 #include <memory>
 #include <vector>
+#include "MNN/Interpreter.hpp"
 #include "Pipeline.hpp"
 #include "Schedule.hpp"
 #include "core/Backend.hpp"
@@ -81,7 +82,7 @@ public:
     Runtime* getCPURuntime() {
         return mRuntime.second.get();
     }
-
+    ErrorCode copycmd(Session &scr,Session &dist);
 public:
     /**
      * @brief get backend that create the tensor.
@@ -152,6 +153,7 @@ private:
     Interpreter::SessionMode mCodegenMode;
     Schedule::ScheduleInfo mInfo;
     ModeGroup mMode;
+    friend Interpreter;
 };
 } // namespace MNN
 

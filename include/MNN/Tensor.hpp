@@ -70,9 +70,9 @@ public:
 
     /** deinitializer */
     ~Tensor();
-
-private:
     Tensor(bool deepCopy, const Tensor* tensor);
+private:
+    
     // remove all assignment operator
     Tensor(const Tensor& tensor)  = delete;
     Tensor(const Tensor&& tensor) = delete;

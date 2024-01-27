@@ -7,6 +7,7 @@
 //
 
 #include "core/Session.hpp"
+#include "MNN/ErrorCode.hpp"
 #include "core/WrapExecution.hpp"
 #include <string.h>
 #include <MNN/AutoTime.hpp>
@@ -448,6 +449,12 @@ Session* Session::clone(RuntimeInfo&& runtime, std::shared_ptr<Schedule::Schedul
     }
     auto dst = new Session(std::move(scheduleInfo), mMode, std::move(runtime));
     return dst;
+}
+
+ErrorCode Session::copycmd(Session &scr,Session &dist)
+{
+    
+
 }
 
 

@@ -6,6 +6,7 @@
 //  Copyright © 2018, Alibaba Group Holding Limited
 //
 
+#include "MNN/MNNForwardType.h"
 #include <math.h>
 #include <fstream>
 #include <iostream>
@@ -326,16 +327,29 @@ int main(int argc, char* argv[]) {
 
     // create net and session
     auto mnnNet = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(poseModel));
+    auto mnnNet2 = std::shared_ptr<MNN::Interpreter>(MNN::Interpreter::createFromFile(poseModel));
     MNN::ScheduleConfig netConfig;
     netConfig.type      = MNN_FORWARD_CPU;
     netConfig.numThread = 4;
+
+    MNN:ScheduleConfig netConfig_2;
+    netConfig_2.type = MNN_FORWARD_OPENCL;
+    netConfig.numThread = 2;
+
     auto session        = mnnNet->createSession(netConfig);
+    auto session2        = mnnNet->createSession(netConfig_2);
 
     auto input = mnnNet->getSessionInput(session, nullptr);
+    auto input2 = mnnNet2->getSessionInput(session2, nullptr);
 
+    // auto input2 = new Tensor(true,   input);
     if (input->elementSize() <= 4) {
         mnnNet->resizeTensor(input, {1, 3, targetHeight, targetWidth});
         mnnNet->resizeSession(session);
+    }
+    if (input2->elementSize() <= 4) {
+        mnnNet2->resizeTensor(input2, {1, 3, targetHeight, targetWidth});
+        mnnNet2->resizeSession(session2);
     }
 
     // preprocess input image
@@ -379,7 +393,7 @@ int main(int argc, char* argv[]) {
     // run...
     {
         AUTOTIME;
-        mnnNet->runSession(session);
+        mnnNet->runSessionCpuGpu(session,session2);
     }
 
     // get output

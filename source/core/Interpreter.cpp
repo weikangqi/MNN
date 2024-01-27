@@ -11,6 +11,7 @@
 #include <MNN/Interpreter.hpp>
 #include <algorithm>
 #include <mutex>
+#include <utility>
 #include <vector>
 #include "MNN_generated.h"
 #include "core/AutoStorage.h"
@@ -247,6 +248,26 @@ Interpreter::~Interpreter() {
     }
     delete mNet;
 }
+Session* Interpreter::createMultiPathSession(const std::vector<ScheduleConfig>& configs,const std::vector<ScheduleConfig>& configs2) {
+    
+    RuntimeInfo runtime = createRuntime(configs);
+    RuntimeInfo runtime2 = createRuntime(configs2);
+    runtime.second->setExternalFile(mNet->externalFile);
+    runtime.second->setAllocatorType(mNet->modes.memoryAllocatorType);
+    if (runtime.first.empty()) {
+        MNN_ERROR("Runtime not valid for create session\n");
+        return nullptr;
+    }
+    runtime2.second->setExternalFile(mNet->externalFile);
+    runtime2.second->setAllocatorType(mNet->modes.memoryAllocatorType);
+    if (runtime2.first.empty()) {
+        MNN_ERROR("Runtime not valid for create session\n");
+        return nullptr;
+    }
+    return createMultiPathSession(configs,configs2, std::move(runtime),std::move(runtime2));
+
+}
+
 
 Session* Interpreter::createMultiPathSession(const std::vector<ScheduleConfig>& configs) {
     RuntimeInfo runtime = createRuntime(configs);
@@ -258,7 +279,98 @@ Session* Interpreter::createMultiPathSession(const std::vector<ScheduleConfig>& 
     }
     return createMultiPathSession(configs, std::move(runtime));
 }
+Session* Interpreter::createMultiPathSession(const std::vector<ScheduleConfig>& configs, const std::vector<ScheduleConfig>& configs2,const RuntimeInfo& runtime,const RuntimeInfo& runtime2) {
+    if (nullptr == mNet->buffer.get()) {
+        MNN_ERROR("The model buffer has been released. Can't create session\n");
+        return nullptr;
+    }
+    if (runtime.first.empty() || runtime2.first.empty()) {
+        MNN_ERROR("Runtime not valid for create session\n");
+        return nullptr;
+    }
+    std::unique_lock<std::mutex> _l(mNet->lock);
+#ifdef MNN_INTERNAL_ENABLED
+    Timer _timer;
+#endif
+    int cacheMode = 0; // No cache
+    Schedule::ScheduleInfo info;
+    auto success = Schedule::schedule(info, mNet->net, configs, runtime);
+    
+    if (!success) {
+        return nullptr;
+    }
+    RuntimeInfo rt = runtime;
+    bool valid  = false;
+    if (mNet->cacheBuffer.get() != nullptr) {
+        for (auto iter : rt.first) {
+            valid = iter.second->onSetCache(mNet->cacheBuffer.get(),
+                                            mNet->cacheBuffer.size());
+            if(!valid) {
+                iter.second->onSetCache(nullptr, 0);
+            }
+            if (valid) {
+                break;
+            }
+        }
+        if (valid) {
+            mNet->lastCacheSize = mNet->cacheBuffer.size();
+            cacheMode = cacheMode | 1; // READ cache
+        }
+    }
 
+    auto newSession =
+        std::unique_ptr<Session>(new Session(std::move(info), mNet->modes, std::move(rt)));
+    if (!newSession->valid()) {
+        MNN_PRINT("Invalide Session!!\n");
+        return nullptr;
+    }
+    auto result = newSession.get();
+    auto validForResize = info.validForResize;
+    if (validForResize && mNet->modes.inputMode == Session_Input_Inside && mNet->modes.resizeMode == Session_Resize_Direct) {
+        result->resize();
+    }
+
+    if ((!mNet->cacheFile.empty()) && (!valid) && mNet->modes.backendMode == Session_Backend_Fix) {
+        // Try to save extra cache
+        auto buffer = result->getCache();
+        if (buffer.first != nullptr && buffer.second > 0) {
+            MNN_PRINT("Write cache to %s, size = %zu\n", mNet->cacheFile.c_str(), buffer.second);
+            writeCacheFile(mNet, buffer);
+            mNet->lastCacheSize = buffer.second;
+            // Write Cache
+            cacheMode = cacheMode | 2;
+        }
+    }
+    // Reset cache
+    result->loadCache(nullptr, 0);
+
+    mNet->sessions.emplace_back(std::move(newSession));
+
+#ifdef MNN_INTERNAL_ENABLED
+    int precision = BackendConfig::Precision_Normal;
+    if (nullptr != configs[0].backendConfig) {
+        precision = configs[0].backendConfig->precision;
+    }
+    int mode = configs[0].mode;
+    mNet->sessionInfo.insert(std::make_pair(result, std::make_tuple(precision, mode)));
+    if (shouldLog(FREQ_HIGH)) {
+        std::map<std::string, std::string> metrics = mNet->basicLogginData;
+        metrics.emplace("UUID", mNet->uuid);
+        metrics.emplace("Time", std::to_string((float)_timer.durationInUs() / 1024.0f));
+        metrics.emplace("Backend", std::to_string(configs[0].type));
+        metrics.emplace("Precision", std::to_string(precision));
+        metrics.emplace("Mode", std::to_string(mode));
+        metrics.emplace("Cache", std::to_string(cacheMode));
+        metrics.emplace("CacheSize", std::to_string((float)(mNet->lastCacheSize / 1024.0f)));
+        metrics.emplace("ModelSize", std::to_string ((float)mNet->buffer.size() / 1024.0f / 1024.0f));
+        metrics.emplace("Usage", std::to_string((int) mNet->net->usage()));
+        metrics.emplace("API", "Interpreter::createMultiPathSession");
+        logAsync(metrics);
+    }
+#endif // MNN_INTERNAL_ENABLED
+
+    return result;
+}
 Session* Interpreter::createMultiPathSession(const std::vector<ScheduleConfig>& configs, const RuntimeInfo& runtime) {
     if (nullptr == mNet->buffer.get()) {
         MNN_ERROR("The model buffer has been released. Can't create session\n");
@@ -350,6 +462,10 @@ Session* Interpreter::createMultiPathSession(const std::vector<ScheduleConfig>& 
 
     return result;
 }
+//code by wkq
+Session* Interpreter::createSession(const ScheduleConfig& config,const ScheduleConfig& config2) {
+    return createMultiPathSession({config},{config2});
+}
 
 Session* Interpreter::createSession(const ScheduleConfig& config) {
     return createMultiPathSession({config});
@@ -419,6 +535,24 @@ ErrorCode Interpreter::runSession(Session* session) const {
 #endif // MNN_INTERNAL_ENABLED
 
     return errorcode;
+}
+ErrorCode Interpreter::runSessionCpuGpu(Session* session,Session* session2) const {
+    std::unique_lock<std::mutex> _l(mNet->lock);
+
+ //   ErrorCode errorcode = session->run();
+        
+    auto& iter = session->mPipelines[0];
+    auto& iter2 = session2->mPipelines[0];
+    
+    auto err1 = iter->execute();
+    auto err2 = iter2->execute();
+    
+
+    
+    return NO_ERROR;
+
+
+  
 }
 
 Tensor* Interpreter::getSessionInput(const Session* session, const char* name) {

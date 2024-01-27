@@ -24,6 +24,7 @@ struct Command : public RefCount {
     std::vector<Tensor*> outputs;
     std::shared_ptr<BufferStorage> buffer;
     std::shared_ptr<Execution> execution;
+    std::shared_ptr<Execution> execution_backup;
     std::shared_ptr<OperatorInfo> info;
     #ifdef MNN_BUILD_CODEGEN
     bool canVectorize = false;

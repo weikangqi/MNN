@@ -216,6 +216,7 @@ public:
      * @return created session if success, NULL otherwise.
      */
     Session* createSession(const ScheduleConfig& config);
+    Session* createSession(const ScheduleConfig& config,const ScheduleConfig& config2);
 
     /**
      * @brief create session with schedule config and user-specified runtime.
@@ -230,6 +231,7 @@ public:
      * @return created session if success, NULL otherwise.
      */
     Session* createMultiPathSession(const std::vector<ScheduleConfig>& configs);
+    Session* createMultiPathSession(const std::vector<ScheduleConfig>& configs,const std::vector<ScheduleConfig>& configs2);
 
     /**
      * @brief create multi-path session with schedule configs and user-specified runtime.
@@ -238,7 +240,7 @@ public:
      * @return created session if success, NULL otherwise.
      */
     Session* createMultiPathSession(const std::vector<ScheduleConfig>& configs, const RuntimeInfo& runtime);
-
+    Session* createMultiPathSession(const std::vector<ScheduleConfig>& configs,const std::vector<ScheduleConfig>& configs2, const RuntimeInfo& runtime, const RuntimeInfo& runtime2);
     /**
      * @brief release session.
      * @param session   given session.
@@ -298,6 +300,7 @@ public:
      * @return result of running.
      */
     ErrorCode runSession(Session* session) const;
+    ErrorCode runSessionCpuGpu(Session* session1,Session* session2) const;
 
     /*
      * @brief run session.
