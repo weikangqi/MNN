@@ -451,11 +451,7 @@ Session* Session::clone(RuntimeInfo&& runtime, std::shared_ptr<Schedule::Schedul
     return dst;
 }
 
-ErrorCode Session::copycmd(Session &scr,Session &dist)
-{
-    
 
-}
 
 
 } // namespace MNN

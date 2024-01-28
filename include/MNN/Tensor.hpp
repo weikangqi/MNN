@@ -306,6 +306,7 @@ public:
     int wait(MapType mtype, bool finish);
 private:
     halide_buffer_t mBuffer;
+public:
     struct InsideDescribe* mDescribe;
 
 private:
