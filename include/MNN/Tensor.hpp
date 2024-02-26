@@ -71,6 +71,9 @@ public:
     /** deinitializer */
     ~Tensor();
     Tensor(bool deepCopy, const Tensor* tensor);
+
+    // create by weikangqi
+    Tensor(bool deepCopy, const Tensor* tensor,const float ratio,const int padding,const bool flag) ;
 private:
     
     // remove all assignment operator
@@ -159,7 +162,8 @@ public:
      * @return created host tensor.
      */
     static Tensor* createHostTensorFromDevice(const Tensor* deviceTensor, bool copyData = true);
-
+    static Tensor* MycreateHostTensorFromDevice(const Tensor* deviceTensor, bool copyData , DimensionType type);
+    static void split(Tensor *src ,Tensor *part1, Tensor *part2);
 public:
     const halide_buffer_t& buffer() const {
         return mBuffer;

@@ -5,7 +5,9 @@
 //  Created by MNN on 2018/09/26.
 //  Copyright © 2018, Alibaba Group Holding Limited
 //
-
+#include <MNN/expr/Expr.hpp>
+#include <MNN/expr/ExprCreator.hpp>
+#include <MNN/expr/Executor.hpp>
 #include "MNN/MNNDefine.h"
 #include "MNN/MNNForwardType.h"
 #include <fstream>
@@ -502,5 +504,27 @@ int main(int argc, char *argv[]) {
   stbi_write_png(outputImageFileName, originalWidth, originalHeight, 4,
                  inputImage, 4 * originalWidth);
   stbi_image_free(inputImage);
+  // std::vector<std::vector<std::vector<float>>> x = { { {1,2,3,4},{1,2,3,4},{1,2,3,4} },  { {1,2,3,4},{1,2,3,4},{1,2,3,4} }   };
+  // float yy[24] = {1.,2.,3.,4.,5.,6.,7.,8.,9.,10.,11.,12.,13.,14.,15.,16.,17.,18.,19.,20.,21.,22.,23.,24.};
+  // // float *C= yy;
+  // Tensor* hostT  = Tensor::create<float>({1,2,3,4},NULL,MNN::Tensor::TENSORFLOW); 
+  // // auto hostF = Tensor::create<float>({1,2,3,4},yy,MNN::Tensor::CAFFE_C4);
+  // // auto hostZ = Tensor::create<float>({1,2,3,4},NULL,MNN::Tensor::CAFFE);
+  // memcpy(hostT->host<float>(),yy,24*sizeof(float));
+  // // hostT->print();
+  // // auto xxx = MNN::Express::Expr::create(hostT);
+  // // auto vart = MNN::Express::Variable::create(xxx);
+  // // vart = _Convert(vart, MNN::Express::NC4HW4);
+  // // auto x = vart->mFrom->inside()->mOutputTensors[0];
+  // // auto yuxi = vart->getTensor();
+  // // yuxi->print();
+  
+
+
+
+  
+
+
+
   return 0;
 }

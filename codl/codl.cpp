@@ -1,5 +1,5 @@
 #include <MNN/MNNDefine.h>
-#include <MNN>
+
 
 int main(void)
 {

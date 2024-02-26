@@ -121,6 +121,54 @@ Tensor::Tensor(bool deepCopy, const Tensor* tensor) {
     mBuffer.host = tensor->buffer().host;
     mBuffer.dimensions = tensor->buffer().dimensions;
 }
+// create by weikangqi
+Tensor::Tensor(bool deepCopy, const Tensor  *  const tensor,const float ratio,const int padding,const bool flag) {
+    mDescribe = new InsideDescribe;
+    mDescribe->mContent = new  InsideDescribe::NativeInsideDescribe;
+    //tensor->mDescribe->mContent;
+    mBuffer.dim = &mDescribe->mContent.get()->dims[0];
+    // auto dim =  TensorUtils::getDescribe(tensor)->dims;
+    for(int i = 0 ; i < 8;i++)
+    {
+        mBuffer.dim[i].extent = tensor->mBuffer.dim[i].extent;
+        // mBuffer.dim[i].flags = dim[i].flags;
+        mBuffer.dim[i].min  = tensor->mBuffer.dim[i].min;
+        mBuffer.dim[i].stride = tensor->mBuffer.dim[i].stride;
+        
+        // mDescribe->mContent->dims[i].extent = tensor->mBuffer.dim[i].extent;
+        // // mDescribe->mContent->dims[i].flags = dim[i].flags;
+        // mDescribe->mContent->dims[i].min  = tensor->mBuffer.dim[i].min;
+        // mDescribe->mContent->dims[i].stride = tensor->mBuffer.dim[i].stride;
+        
+
+    }
+    //set hight 
+    
+    mBuffer.dim[2].extent = mBuffer.dim[2].extent/ratio;
+    // mDescribe->mContent->dims[2].extent = mBuffer.dim[2].extent/ratio;
+
+    //set stride
+    mBuffer.dim[1].stride = mBuffer.dim[1].stride/ratio;
+    mBuffer.dim[0].stride = mBuffer.dim[0].stride/ratio;
+    // mDescribe->mContent->dims[1].extent = mBuffer.dim[1].stride;
+    // mDescribe->mContent->dims[0].extent = mBuffer.dim[0].stride;
+ 
+
+    mBuffer.type = tensor->getType();
+    mBuffer.device = tensor->deviceId();
+    
+     uint8_t * address =  (uint8_t *)malloc(sizeof(float)* mBuffer.dim[0].extent* mBuffer.dim[1].extent * mBuffer.dim[2].extent* mBuffer.dim[3].extent);
+    // uint8_t *address = (uint8_t *)malloc(8);
+    if(address == nullptr)
+    {
+        MNN_PRINT("malloc error\n");
+    }
+    mBuffer.host = address;
+    // mDescribe->mContent->setBackend(tensor->mDescribe->mContent->getBackend());
+    // mBuffer.host = tensor->buffer().host;
+
+    mBuffer.dimensions = tensor->buffer().dimensions;
+}
 
 Tensor::~Tensor() {
     // MNN_PRINT("free tensor:%p\n", this);
@@ -184,6 +232,14 @@ bool Tensor::copyToHostTensor(Tensor* hostTensor) const {
 
 Tensor* Tensor::createHostTensorFromDevice(const Tensor* device, bool copyContent) {
     auto tensor = Tensor::create(device->shape(), device->getType(), nullptr, TensorUtils::getDimType(device));
+    if (copyContent) {
+        device->copyToHostTensor(tensor);
+    }
+    return tensor;
+}
+
+Tensor* Tensor::MycreateHostTensorFromDevice(const Tensor* device, bool copyContent,DimensionType type) {
+    auto tensor = Tensor::create(device->shape(), device->getType(), nullptr, type);
     if (copyContent) {
         device->copyToHostTensor(tensor);
     }
@@ -378,6 +434,26 @@ void Tensor::print() const {
         delete printee;
     }
 }
+
+// create by weikangqi
+void Tensor::split(Tensor *src ,Tensor *part1, Tensor *part2)
+{
+    int ratio = 2;
+    // if(src->mDescribe->mContent.get()->dimensionFormat == MNN_DATA_FORMAT_NC4HW4)
+    // {
+
+    //     MNN_PRINT("format: NC4HW4\n");
+        
+    // }
+    for(int c = 0; c < part1->mBuffer.dim[1].extent/4; c++)
+    {
+
+        // memcpy(part1->host<uint8_t>() + 4* src->width()*src->height()/ratio*c,src->host<uint8_t>() + 4* src->width()*src->height()*c,4* src->width()*src->height()/ratio );
+        // memcpy(part1->host<uint8_t>(),src->host<uint8_t>(),1);   
+        memcpy(part1->mBuffer.host,src->mBuffer.host,1);
+    }
+}
+
 
 void Tensor::printShape() const {
     const int dims = this->dimensions();

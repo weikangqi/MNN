@@ -605,20 +605,30 @@ ErrorCode Interpreter::runSessionCpuGpu(Session *session,
       }
     }
   }
+      // uint8_t * address =  (uint8_t *)malloc(sizeof(float)* mBuffer.dim[0].extent* mBuffer.dim[1].extent * mBuffer.dim[2].extent* mBuffer.dim[3].extent);
+
   
   for (int i = 0; i< cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs.size() ;i++) {
       cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->wait(Tensor::MAP_TENSOR_READ , true);
 
-      // bool isOk =  gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->copyFromHostTensor( cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]);
-      
+     
       Tensor * hostT;
       hostT = Tensor::createHostTensorFromDevice(cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],true);
-      //  gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i];
-      //  cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->print();
-      gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->copyFromHostTensor(hostT);
-      TensorUtils::compareTensors(hostT,cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],0.001);
-        
+      MNN_PRINT("%d\n",hostT->width());
+      Tensor *split_tensot = new Tensor(true,hostT,2,0,0);
+      Tensor::split(hostT,split_tensot,nullptr);
+      // MNN_PRINT("hostY");
+      // hostY->print();
+      // hostY->printShape();
 
+      MNN_PRINT("hostT");
+      // split_tensot->print();
+      
+
+
+      // TensorUtils::compareTensors(hostT,cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],0.001);
+    
+      gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->copyFromHostTensor(hostT);
   }
   
   for (int i = 4; i < len; i++) {
