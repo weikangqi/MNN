@@ -123,6 +123,9 @@ Tensor::Tensor(bool deepCopy, const Tensor* tensor) {
 }
 // create by weikangqi
 Tensor::Tensor(bool deepCopy, const Tensor  *  const tensor,const float ratio,const int padding,const bool flag) {
+    /*
+        @param flag: 0 or 1 , 0 up part of the tensor ,1 -> 
+    */
     mDescribe = new InsideDescribe;
     mDescribe->mContent = new  InsideDescribe::NativeInsideDescribe;
     //tensor->mDescribe->mContent;
@@ -134,24 +137,15 @@ Tensor::Tensor(bool deepCopy, const Tensor  *  const tensor,const float ratio,co
         // mBuffer.dim[i].flags = dim[i].flags;
         mBuffer.dim[i].min  = tensor->mBuffer.dim[i].min;
         mBuffer.dim[i].stride = tensor->mBuffer.dim[i].stride;
-        
-        // mDescribe->mContent->dims[i].extent = tensor->mBuffer.dim[i].extent;
-        // // mDescribe->mContent->dims[i].flags = dim[i].flags;
-        // mDescribe->mContent->dims[i].min  = tensor->mBuffer.dim[i].min;
-        // mDescribe->mContent->dims[i].stride = tensor->mBuffer.dim[i].stride;
-        
-
     }
-    //set hight 
-    
-    mBuffer.dim[2].extent = mBuffer.dim[2].extent/ratio;
-    // mDescribe->mContent->dims[2].extent = mBuffer.dim[2].extent/ratio;
 
+    //set hight 
+                                         // flag = 1   the bottom part                   // flag = 0 the upper part
+    mBuffer.dim[2].extent = flag?(mBuffer.dim[2].extent - (int)(mBuffer.dim[2].extent/ratio)):mBuffer.dim[2].extent/ratio;
     //set stride
-    mBuffer.dim[1].stride = mBuffer.dim[1].stride/ratio;
-    mBuffer.dim[0].stride = mBuffer.dim[0].stride/ratio;
-    // mDescribe->mContent->dims[1].extent = mBuffer.dim[1].stride;
-    // mDescribe->mContent->dims[0].extent = mBuffer.dim[0].stride;
+    mBuffer.dim[1].stride = flag?(mBuffer.dim[1].stride - (int)(mBuffer.dim[1].stride/ratio)):mBuffer.dim[1].stride/ratio;
+    mBuffer.dim[0].stride = flag?(mBuffer.dim[0].stride - (int)(mBuffer.dim[0].stride/ratio)):mBuffer.dim[0].stride/ratio;
+
  
 
     mBuffer.type = tensor->getType();
@@ -438,19 +432,10 @@ void Tensor::print() const {
 // create by weikangqi
 void Tensor::split(Tensor *src ,Tensor *part1, Tensor *part2)
 {
-    int ratio = 2;
-    // if(src->mDescribe->mContent.get()->dimensionFormat == MNN_DATA_FORMAT_NC4HW4)
-    // {
-
-    //     MNN_PRINT("format: NC4HW4\n");
-        
-    // }
     for(int c = 0; c < part1->mBuffer.dim[1].extent/4; c++)
     {
-
-        // memcpy(part1->host<uint8_t>() + 4* src->width()*src->height()/ratio*c,src->host<uint8_t>() + 4* src->width()*src->height()*c,4* src->width()*src->height()/ratio );
-        // memcpy(part1->host<uint8_t>(),src->host<uint8_t>(),1);   
-        memcpy(part1->mBuffer.host,src->mBuffer.host,1);
+        memcpy(part1->mBuffer.host + sizeof(float) * 4 * src->width()*(part1->height()) *c,src->mBuffer.host + sizeof(float) * 4 * src->width()*src->height() *c, sizeof(float) * 4 * src->width()*(part1->height()));
+        memcpy(part2->mBuffer.host + sizeof(float) * 4 * src->width()*(part2->height()) *c,src->mBuffer.host + sizeof(float) * 4 * src->width()*src->height() *c + sizeof(float) * 4 * src->width()*(part1->height()), sizeof(float) * 4 * src->width()*(part2->height()));
     }
 }
 
