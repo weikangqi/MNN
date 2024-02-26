@@ -615,15 +615,19 @@ ErrorCode Interpreter::runSessionCpuGpu(Session *session,
       Tensor * hostT;
       hostT = Tensor::createHostTensorFromDevice(cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],true);
       MNN_PRINT("%d\n",hostT->width());
-      Tensor *split_tensot = new Tensor(true,hostT,2,0,0);
-      Tensor::split(hostT,split_tensot,nullptr);
+      Tensor *part0 = new Tensor(true,hostT,2,0,0);
+      Tensor *part1 = new Tensor(true,hostT,2,0,1);
+      Tensor::split(hostT,part0,part1);
       // MNN_PRINT("hostY");
       // hostY->print();
       // hostY->printShape();
 
-      MNN_PRINT("hostT");
-      // split_tensot->print();
-      
+      MNN_PRINT("part0");
+      part0->print();
+      MNN_PRINT("part1");
+      part1->print();
+      MNN_PRINT("split_tensot");
+      hostT->print();
 
 
       // TensorUtils::compareTensors(hostT,cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],0.001);
