@@ -163,7 +163,14 @@ public:
      */
     static Tensor* createHostTensorFromDevice(const Tensor* deviceTensor, bool copyData = true);
     static Tensor* MycreateHostTensorFromDevice(const Tensor* deviceTensor, bool copyData , DimensionType type);
-    static void split(Tensor *src ,Tensor *part1, Tensor *part2);
+    static void split(Tensor *src ,Tensor *part1, Tensor *part2,int padding);
+    static void copydim(Tensor *dst,Tensor *src);
+    /**
+     * @brief 
+    **/
+
+
+    static void merge(Tensor *src,Tensor *part0,Tensor *part1,int padding);
 public:
     const halide_buffer_t& buffer() const {
         return mBuffer;

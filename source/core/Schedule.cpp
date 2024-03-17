@@ -87,7 +87,7 @@ static void generateScheduleGraph(vector<const Op*>& ops, const Net* net, const 
         ops.reserve(net->oplists()->size());
         for (int i = 0; i < net->oplists()->size(); ++i) {
             auto op = net->oplists()->GetAs<Op>(i);
-            ops.emplace_back(op);
+            ops.emplace_back(op);  //ops[4]->type()  MNN::OpType_ConvolutionDepthwise
         }
         return;
     }
@@ -197,8 +197,8 @@ static vector<Schedule::OpCacheInfo> _scheduleUnit(const Net* net, const Schedul
                                                     const vector<shared_ptr<Tensor>>& allTensors) {
     vector<Schedule::OpCacheInfo> oplists;
     vector<const Op*> ops;
-    generateScheduleGraph(ops, net, configs, allTensors);
-    initPipelineInfosFromOps(oplists, ops, allTensors);
+    generateScheduleGraph(ops, net, configs, allTensors); //import 构建计算图
+    initPipelineInfosFromOps(oplists, ops, allTensors); //import 初始化pipline 后续计算全部根据pipline
     return oplists;
 }
 
@@ -211,18 +211,18 @@ bool Schedule::schedule(ScheduleInfo& scheduleInfo, const Net* net, const std::v
         // Const not init, init it
         BackendConfig defaultConfig;
         defaultConfig.flags = 4;
-        scheduleInfo.defaultBackend.reset(runtimeInfo.second->onCreate(&defaultConfig));
+        scheduleInfo.defaultBackend.reset(runtimeInfo.second->onCreate(&defaultConfig));  // 通过runtimeInfo.second 创建默认的backend 给scheduleInfo
         ErrorCode code = NO_ERROR;
-        initConstTensors(scheduleInfo.allTensors, net, scheduleInfo.defaultBackend.get(), code);
+        initConstTensors(scheduleInfo.allTensors, net, scheduleInfo.defaultBackend.get(), code); //初始化常量Tensor，MNN.fbs 里面的OpType的Const
         if (NO_ERROR != code) {
             MNN_ERROR("Schedule Const init errorcode = %d\n", code);
             return false;
         }
     }
-    bool valid = initTensors(scheduleInfo.allTensors, net);
+    bool valid = initTensors(scheduleInfo.allTensors, net); //为所有的tensor其分配dim，初始化。MNN中每个tensor都会有一个index，方便操作
     scheduleInfo.validForResize = valid;
     std::vector<std::shared_ptr<Tensor>>& allTensors = scheduleInfo.allTensors;
-    std::vector<std::pair<Schedule::BackendCache, std::vector<Schedule::OpCacheInfo>>> result;
+    std::vector<std::pair<Schedule::BackendCache, std::vector<Schedule::OpCacheInfo>>> result;  //初始化 用来存op
 
     for (auto& config : configs) {
         Backend::Info compute;
@@ -235,13 +235,13 @@ bool Schedule::schedule(ScheduleInfo& scheduleInfo, const Net* net, const std::v
             }
         }
         compute.user      = config.backendConfig;
-        auto oplists      = _scheduleUnit(net, config, allTensors);
+        auto oplists      = _scheduleUnit(net, config, allTensors);  //这里输出对应的op 执行顺序
         Schedule::BackendCache cache;
         cache.info = std::move(compute);
-        result.emplace_back(std::make_pair(cache, std::move(oplists)));
+        result.emplace_back(std::make_pair(cache, std::move(oplists)));   //转入result
     }
 
-    scheduleInfo.pipelineInfo = std::move(result);
+    scheduleInfo.pipelineInfo = std::move(result); //存入pipline
 
     // get all used op's output, drop unused op, won't change op order. always insert all Input Ops
     std::vector<const Op*> oplists;
@@ -296,9 +296,10 @@ bool Schedule::schedule(ScheduleInfo& scheduleInfo, const Net* net, const std::v
         userSetOutput = false;
     }
     // add input/output tensor to schedule's input/output
+    //配置scheduleInfo 记录模型的输入 输出张量
     for (int index = 0; index < allTensors.size(); index++) {
         auto t = allTensors[index].get();
-        auto usage = TensorUtils::getDescribe(t)->usage;
+        auto usage = TensorUtils::getDescribe(t)->usage;  //usage NORMAL ,INPUT 
         if (usage == Tensor::InsideDescribe::INPUT) {
             scheduleInfo.inputTensors.insert(std::make_pair(net->tensorName()->GetAsString(index)->c_str(), t));
         }
@@ -307,13 +308,14 @@ bool Schedule::schedule(ScheduleInfo& scheduleInfo, const Net* net, const std::v
                        std::make_pair(net->tensorName()->GetAsString(index)->c_str(), t));
         }
     }
-    if (net->usage() == Usage_INFERENCE_STATIC) {
+    // 是否是静态推理
+    if (net->usage() == Usage_INFERENCE_STATIC) {  
         for (auto& pipInfo : scheduleInfo.pipelineInfo) {
             pipInfo.first.needComputeGeometry = false;
             pipInfo.first.needComputeShape = false;
         }
     }
-
+    // 设置flag needComputeGeometry需要计算 计算图buildConstantTensors
 #ifndef MNN_BUILD_MINI
     for (auto iter = scheduleInfo.pipelineInfo.begin(); iter != scheduleInfo.pipelineInfo.end();) {
         if (!iter->first.needComputeGeometry) {

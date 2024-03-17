@@ -20,14 +20,14 @@ bool needComputeOp(const Op* op) {
 }
 bool initConstTensors(std::vector<std::shared_ptr<Tensor>>& tensors, const Net* net, Backend* defaultBackend, ErrorCode& code) {
     bool valid    = true;
-    tensors.resize(net->tensorName()->size());
+    tensors.resize(net->tensorName()->size()); //tensor vector进行resize 从999 到该有的大小
     // Set up const
     for (int opIndex = 0; opIndex < net->oplists()->size(); ++opIndex) {
         auto op = net->oplists()->GetAs<Op>(opIndex);
-        if (OpType_Const == op->type() || OpType_TrainableParam == op->type()) {
+        if (OpType_Const == op->type() || OpType_TrainableParam == op->type()) {  //op.type MNN::OpType_Convolution
             MNN_ASSERT(nullptr != op->outputIndexes());
             auto index = op->outputIndexes()->data()[0];
-            tensors[index].reset(new Tensor);
+            tensors[index].reset(new Tensor);                  //为常量tensor 分配内存
             TensorUtils::getDescribe(tensors[index].get())->index = index;
             auto parameter = op->main_as_Blob();
             auto output    = tensors[index].get();
@@ -113,7 +113,7 @@ bool initTensors(std::vector<std::shared_ptr<Tensor>>& tensors, const Net* net) 
     for (int i=0; i<tensors.size(); ++i) {
         // Init all tensor except for const
         if (tensors[i].get() == nullptr) {
-            tensors[i].reset(new Tensor);
+            tensors[i].reset(new Tensor);  //虽然这里new 了一个tensor 但是 tensor 内部存储数据的内存 仍然没有分配
             TensorUtils::getDescribe(tensors[i].get())->index = i;
             // MNN_PRINT("initTensors create tensor:%p, index:%d, backend:%d\n", tensors[i].get(), i, TensorUtils::getDescribe(tensors[i].get())->backend);
         }
@@ -124,8 +124,9 @@ bool initTensors(std::vector<std::shared_ptr<Tensor>>& tensors, const Net* net) 
             des[index] = describes->GetAs<TensorDescribe>(i);
         }
     }
+    //设置Tensor的量化信息
     for (int i = 0; i < tensors.size(); ++i) {
-        if (des[i] != nullptr && des[i]->quantInfo()) {
+        if (des[i] != nullptr && des[i]->quantInfo()) {    
             TensorUtils::getDescribe(tensors[i].get())->quantAttr.reset(new QuantAttr);
             auto quant   = TensorUtils::getDescribe(tensors[i].get())->quantAttr.get();
             quant->scale =  des[i]->quantInfo()->scale();
@@ -136,6 +137,8 @@ bool initTensors(std::vector<std::shared_ptr<Tensor>>& tensors, const Net* net) 
         }
     }
     // Set Input Tensor, if the type of input is not the same with ExtraTensorDescribe, use input parameter
+    // 其实就是设置input 层的tensor，将input op的dim 维度信息 给Tensor
+    // 对于输入图片是动态的 dim的后的h,w是-1 （猜想）
     for (int opIndex = 0; opIndex < net->oplists()->size(); ++opIndex) {
         auto op = net->oplists()->GetAs<Op>(opIndex);
         if (OpType_Input == op->type()) {
@@ -224,13 +227,13 @@ void initPipelineInfosFromOps(std::vector<Schedule::OpCacheInfo>& infos, std::ve
         if (nullptr != op->outputIndexes()) {
             auto data = op->outputIndexes()->data();
             for (int j = 0; j < op->outputIndexes()->size(); ++j) {
-                opInfo.outputs.push_back(allTensors[data[j]].get());
+                opInfo.outputs.push_back(allTensors[data[j]].get());  // 这里设置OP 的输出tensor
             }
         }
         if (nullptr != op->inputIndexes()) {
             auto data = op->inputIndexes()->data();
             for (int j = 0; j < op->inputIndexes()->size(); ++j) {
-                opInfo.inputs.push_back(allTensors[data[j]].get());
+                opInfo.inputs.push_back(allTensors[data[j]].get());  // 这里设置OP 的输入tensor
             }
         }
         if (needComputeOp(op)) {

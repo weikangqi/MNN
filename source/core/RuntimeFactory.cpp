@@ -17,7 +17,7 @@ Runtime* RuntimeFactory::create(const Backend::Info& info) {
         MNN_PRINT("Create Runtime Failed because no creator for %d\n", info.type);
         return nullptr;
     }
-    auto runtime = creator->onCreate(info);
+    auto runtime = creator->onCreate(info); //虚函数 调用相应的后端进行初始化
     if (nullptr == runtime) {
         MNN_PRINT("Create Runtime failed, the creator return nullptr, type = %d\n", info.type);
     }

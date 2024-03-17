@@ -270,6 +270,7 @@ ErrorCode Pipeline::encode(bool supportDebug, bool permitCodegen) {
 #ifndef MNN_BUILD_MINI
     mContext.clear();
     /** Size Compute and compute Const Begin */
+    //计算各层的Ternsor的dim
     auto res = GeometryComputerUtils::shapeComputeAndGeometryTransform(
         mInfo.second, mContext, mInfo.first.cache.second, mUseGeometry, false,
         permitCodegen);
@@ -1107,8 +1108,10 @@ ErrorCode Pipeline::execute() {
   auto &mBackupBackend = mInfo.first.cache.second;
   mBackend->onExecuteBegin();
   int i = 0;
+  int j = 0;
   for (auto &info : mInfo.second) {
     auto &buffer = info.executeBuffer;
+    j++;
 // #define LOG_VERPOSE
 #ifdef LOG_VERPOSE
     FUNC_PRINT_ALL(info.op->name()->c_str(), s);
@@ -1148,12 +1151,29 @@ ErrorCode Pipeline::execute() {
       }
 #endif
       i++;
+      // if(i == 9)
+      // {
+      //   MNN_PRINT("\n mInfo.second[9].outputs[0] \n");
+      //   mInfo.second[9].outputs[0]->print();
+      // }
+      // if(i == 10)
+      // {
+    
+      
+      //   Tensor out (mInfo.second[9].outputs[0],Tensor::CAFFE,true);
+      //   mInfo.second[9].outputs[0]->copyToHostTensor(&out);
+      //   out.print(); 
+      // }
+
+      
       if (NO_ERROR != code) {
         mBackend->onExecuteEnd();
         return code;
       }
     }
   }
+  // MNN_PRINT("\nprint\n");
+  // mInfo.second[mInfo.second.size()-1].outputs[0]->print();
   mBackend->onExecuteEnd();
   return NO_ERROR;
 }

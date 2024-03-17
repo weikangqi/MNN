@@ -383,7 +383,7 @@ int main(int argc, char *argv[]) {
 
   MNN::ScheduleConfig netConfig_gpu;
   netConfig_gpu.type = MNN_FORWARD_OPENCL;
-  netConfig_gpu.numThread = 2;
+  netConfig_gpu.numThread = 1;
 
   auto session_cpu = mnnNet_cpu->createSession(netConfig_cpu);
   auto session_gpu = mnnNet_gpu->createSession(netConfig_gpu);

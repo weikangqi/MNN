@@ -67,10 +67,10 @@ struct Tensor::InsideDescribe {
         MEMORY_OUTSIDE,
     };
     enum Usage {
-        NORMAL,
-        INPUT,
-        OUTPUT,
-        CONSTANT,
+        NORMAL,   //正常的
+        INPUT,    //这个张量是模型的输入
+        OUTPUT,   //这个张量是模型的输出
+        CONSTANT, // 常量张量
         /** Whether the tensor is a trainable parameter. Trainable parameter should be stored in a different area. */
         TRAINABLE,
     };

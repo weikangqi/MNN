@@ -142,6 +142,7 @@ public:
 
     std::pair<const void*, size_t> makeCache(void* tuneInfo);
     bool setCache(std::pair<const void*, size_t> cache);
+    std::shared_ptr<::cl::CommandQueue> mCommandQueuePtr;
 private:
     bool loadProgram(const std::string &programName, cl::Program *program);
     bool buildProgram(const std::string &buildOptionsStr, cl::Program *program);
@@ -151,7 +152,7 @@ private:
 private:
     std::shared_ptr<::cl::Context> mContext;
     std::shared_ptr<::cl::Device> mFirstGPUDevicePtr;
-    std::shared_ptr<::cl::CommandQueue> mCommandQueuePtr;
+    
     std::map<std::tuple<std::string, std::string>, ::cl::Program> mBuildProgramMap;
     std::shared_ptr<::cl::CommandQueue> mRecordableQueuePtr;
     uint64_t mGPUGlobalMemeryCacheSize;

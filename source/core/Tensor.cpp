@@ -141,13 +141,14 @@ Tensor::Tensor(bool deepCopy, const Tensor  *  const tensor,const float ratio,co
 
     //set hight 
                                          // flag = 1   the bottom part                   // flag = 0 the upper part
-    mBuffer.dim[2].extent = flag?(mBuffer.dim[2].extent - (int)(mBuffer.dim[2].extent/ratio)):mBuffer.dim[2].extent/ratio;
+    mBuffer.dim[2].extent = flag?(mBuffer.dim[2].extent - (int)(mBuffer.dim[2].extent*ratio) + padding):mBuffer.dim[2].extent*ratio + padding;
     //set stride
-    mBuffer.dim[1].stride = flag?(mBuffer.dim[1].stride - (int)(mBuffer.dim[1].stride/ratio)):mBuffer.dim[1].stride/ratio;
-    mBuffer.dim[0].stride = flag?(mBuffer.dim[0].stride - (int)(mBuffer.dim[0].stride/ratio)):mBuffer.dim[0].stride/ratio;
-
- 
-
+    //batch stride = chanel * h *w 
+    mBuffer.dim[0].stride =  mBuffer.dim[1].extent * mBuffer.dim[2].extent * mBuffer.dim[3].extent; 
+    //channel stride =  h *w 
+    mBuffer.dim[1].stride =  mBuffer.dim[2].extent * mBuffer.dim[3].extent;
+    //height stride = w
+    mBuffer.dim[2].stride = mBuffer.dim[3].extent;
     mBuffer.type = tensor->getType();
     mBuffer.device = tensor->deviceId();
     
@@ -430,15 +431,56 @@ void Tensor::print() const {
 }
 
 // create by weikangqi
-void Tensor::split(Tensor *src ,Tensor *part1, Tensor *part2)
+void Tensor::split(Tensor *src ,Tensor *part1, Tensor *part2, int padding)
 {
     for(int c = 0; c < part1->mBuffer.dim[1].extent/4; c++)
     {
-        memcpy(part1->mBuffer.host + sizeof(float) * 4 * src->width()*(part1->height()) *c,src->mBuffer.host + sizeof(float) * 4 * src->width()*src->height() *c, sizeof(float) * 4 * src->width()*(part1->height()));
-        memcpy(part2->mBuffer.host + sizeof(float) * 4 * src->width()*(part2->height()) *c,src->mBuffer.host + sizeof(float) * 4 * src->width()*src->height() *c + sizeof(float) * 4 * src->width()*(part1->height()), sizeof(float) * 4 * src->width()*(part2->height()));
+        if(part1 != nullptr)
+        {
+            memcpy(part1->mBuffer.host + sizeof(float) * 4 * src->width()*(part1->height()) *c,src->mBuffer.host + sizeof(float) * 4 * src->width()*src->height() *c, sizeof(float) * 4 * src->width()*(part1->height()));
+        }
+        
+        if(part2 != nullptr)
+        {
+            memcpy(part2->mBuffer.host + sizeof(float) * 4 * src->width()*(part2->height()) *c,src->mBuffer.host + sizeof(float) * 4 * src->width()*src->height() *c + sizeof(float) * 4 * src->width()*(part1->height()-2 * padding), sizeof(float) * 4 * src->width()*(part2->height()));
+        }       
+        
     }
 }
 
+// crearte by weikangqi 
+void Tensor::merge(Tensor *src,Tensor *part0,Tensor *part1,int padding)
+{
+    if(src == nullptr || part0 == nullptr || part1 == nullptr) return;
+    int channel = src->channel();
+
+    for(int c = 0; c < channel/4; c++)
+    {
+        memcpy(src->mBuffer.host + sizeof(float) * 4 * src->width()*src->height() *c,  part0->mBuffer.host +  sizeof(float)*4*part0->width()*part0->height() *c             ,sizeof(float) *4 * (part0->height() -padding) * (part0->width()));
+        memcpy(src->mBuffer.host + sizeof(float) * 4 * src->width() * src->height() *c + sizeof(float) *4 * (part0->height() -padding) * (part0->width()),
+                part1->mBuffer.host + sizeof(float) * part1->height() *part1->width() *4*c,
+                sizeof(float)*4*(part1->height()-padding)*part1->width());
+
+    }
+}
+// crearte by weikangqi 
+void Tensor::copydim(Tensor *dst,Tensor *src)
+{
+    for(int i = 0; i< 4;i++)
+    {
+        dst->mDescribe->mContent->dims[0].extent  =  src->mDescribe->mContent->dims[0].extent;
+        dst->mDescribe->mContent->dims[1].extent  =  src->mDescribe->mContent->dims[1].extent;
+        dst->mDescribe->mContent->dims[2].extent  =  src->mDescribe->mContent->dims[2].extent;
+        dst->mDescribe->mContent->dims[3].extent  =  src->mDescribe->mContent->dims[3].extent;
+
+        dst->mDescribe->mContent->dims[0].stride  =  src->mDescribe->mContent->dims[0].stride;
+        dst->mDescribe->mContent->dims[1].stride  =  src->mDescribe->mContent->dims[1].stride;
+        dst->mDescribe->mContent->dims[2].stride  =  src->mDescribe->mContent->dims[2].stride;
+        dst->mDescribe->mContent->dims[3].stride  =  src->mDescribe->mContent->dims[3].stride;
+    }
+
+
+}
 
 void Tensor::printShape() const {
     const int dims = this->dimensions();

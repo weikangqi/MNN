@@ -25,6 +25,7 @@
 #include <stdio.h>
 #include <utility>
 #include <vector>
+#include <future>
 #ifdef MNN_INTERNAL_ENABLED
 #include "internal/logging/Log.hpp"
 #include "internal/logging/LogHelper.hpp"
@@ -282,7 +283,7 @@ Session *Interpreter::createMultiPathSession(
 
 Session *Interpreter::createMultiPathSession(
     const std::vector<ScheduleConfig> &configs) {
-  RuntimeInfo runtime = createRuntime(configs);
+  RuntimeInfo runtime = createRuntime(configs);  //创建runtime 以及相应的后端 backend 的初始化
   runtime.second->setExternalFile(mNet->externalFile);
   runtime.second->setAllocatorType(mNet->modes.memoryAllocatorType);
   if (runtime.first.empty()) {
@@ -580,20 +581,25 @@ ErrorCode Interpreter::runSessionCpuGpu(Session *session,
                                         Session *session2) const {
   std::unique_lock<std::mutex> _l(mNet->lock);
 
-  //   ErrorCode errorcode = session->run();
 
   auto &gpu_iter = session->mPipelines[0];
   auto &cpu_iter = session2->mPipelines[0];
   auto &mBackend_gpu = gpu_iter->mInfo.first.cache.first;
   auto &mBackend_cpu = cpu_iter->mInfo.first.cache.first;
+
+  float memoryUsage = 0.0f;
+  session->getInfo(MNN::Interpreter::MEMORY, &memoryUsage);
+  float memoryUsage2 = 0.0f;
+  session2->getInfo(MNN::Interpreter::MEMORY, &memoryUsage2);
+  MNN_PRINT("gpu memory: %fMB, cpu memory: %fMB\n", memoryUsage, memoryUsage2);
+
   mBackend_cpu->onExecuteBegin();
   mBackend_gpu->onExecuteBegin();
 
-  //   auto err1 = iter->execute();
-  //   auto err2 = iter2->execute();
+
   int len = cpu_iter->mInfo.second.size();
   
-  for (int i = 0; i < 4; i++) {
+  for (int i = 0; i < 5; i++) {
     auto &buffer = cpu_iter->mInfo.second[i].executeBuffer;
     for (auto &cmdP : buffer.command) {
       auto &cmd = *cmdP;
@@ -605,53 +611,169 @@ ErrorCode Interpreter::runSessionCpuGpu(Session *session,
       }
     }
   }
-      // uint8_t * address =  (uint8_t *)malloc(sizeof(float)* mBuffer.dim[0].extent* mBuffer.dim[1].extent * mBuffer.dim[2].extent* mBuffer.dim[3].extent);
 
-  
-  for (int i = 0; i< cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs.size() ;i++) {
-      cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->wait(Tensor::MAP_TENSOR_READ , true);
+ cpu_iter->mInfo.second[7].executeBuffer.command[0]->execution->onExecute(cpu_iter->mInfo.second[7].executeBuffer.command[0]->workInputs,cpu_iter->mInfo.second[7].executeBuffer.command[0]->workOutputs);
+ gpu_iter->mInfo.second[8].inputs[0]->copyFromHostTensor(Tensor::createHostTensorFromDevice(cpu_iter->mInfo.second[7].outputs[0],true));
 
-     
-      Tensor * hostT;
-      hostT = Tensor::createHostTensorFromDevice(cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],true);
-      MNN_PRINT("%d\n",hostT->width());
-      Tensor *part0 = new Tensor(true,hostT,2,0,0);
-      Tensor *part1 = new Tensor(true,hostT,2,0,1);
-      Tensor::split(hostT,part0,part1);
-      // MNN_PRINT("hostY");
-      // hostY->print();
-      // hostY->printShape();
+//GPU
+auto future = std::async(std::launch::async,[&](){
+  // mBackend_gpu->onExecuteEnd();
 
-      MNN_PRINT("part0");
-      part0->print();
-      MNN_PRINT("part1");
-      part1->print();
-      MNN_PRINT("split_tensot");
-      hostT->print();
-
-
-      // TensorUtils::compareTensors(hostT,cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],0.001);
+   
     
-      gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->copyFromHostTensor(hostT);
-  }
-  
-  for (int i = 4; i < len; i++) {
-    auto &buffer = gpu_iter->mInfo.second[i].executeBuffer;
-
-    for (auto &cmdP : buffer.command) {
-      auto &cmd = *cmdP;
-      auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
-
-      if (NO_ERROR != code) {
-        mBackend_gpu->onExecuteEnd();
-        return code;
+    for (int i = 8; i < 10; i++) { //35 36
+      auto &buffer = gpu_iter->mInfo.second[i].executeBuffer;
+      for (auto &cmdP : buffer.command) {
+        auto &cmd = *cmdP;
+        cmd.execution->onResize(cmd.workInputs, cmd.workOutputs);
+        auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
       }
+  }
+  gpu_iter->mInfo.second[9].executeBuffer.command[0]->execution->backend()->onSync(Tensor::MAP_TENSOR_READ,true,NULL);
+  
+  return;
+});
+        for (int i = 5; i < 7; i++) { 
+      auto &buffer = cpu_iter->mInfo.second[i].executeBuffer;
+      for (auto &cmdP : buffer.command) {
+        auto &cmd = *cmdP;
+        // cmd.execution->onResize(cmd.workInputs,cmd.workOutputs);
+        auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
     }
   }
 
-  mBackend_cpu->onExecuteEnd();
-  mBackend_gpu->onExecuteEnd();
-  return NO_ERROR;
+  future.wait();
+    //  Tensor out (gpu_iter->mInfo.second[9].outputs[0],Tensor::CAFFE,true);
+    // gpu_iter->mInfo.second[9].outputs[0]->copyToHostTensor(&out);
+    // out.print(); 
+
+cpu_iter->mInfo.second[10].inputs[1]->copyFromHostTensor(Tensor::createHostTensorFromDevice(gpu_iter->mInfo.second[9].outputs[0],true));
+  for (int i = 10; i < len; i++) { //35 37
+    auto &buffer = cpu_iter->mInfo.second[i].executeBuffer;
+    for (auto &cmdP : buffer.command) {
+      auto &cmd = *cmdP;
+      auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
+    }
+    
+  }
+
+  //  cpu_iter->mInfo.second[len-1].outputs[0]->print();
+
+
+
+
+
+    
+  // float padding = 0.5;
+  // //op chain run
+  // Tensor *synch = new Tensor(true,cpu_iter->mInfo.second[6].executeBuffer.command[0]->workOutputs[0],1,0,0);
+  // for (int i = 0; i< cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs.size() ;i++) {
+  //     cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->wait(Tensor::MAP_TENSOR_READ , true);
+  //     Tensor * hostT;
+  //     hostT = Tensor::createHostTensorFromDevice(cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i],true);
+      
+  //     Tensor *part0 = new Tensor(true,hostT,0.6,0,0);
+  //     Tensor *part1 = new Tensor(true,hostT,0.6,0,1);
+
+
+
+  //     Tensor::split(hostT,part0,part1,0);
+  //     Tensor::copydim(gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i], part0);
+
+
+  //     gpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]->mDescribe->mContent->dims[2].extent  =   gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->mDescribe->mContent->dims[2].extent;
+  //     gpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]->mDescribe->mContent->dims[0].stride  = 85*34*96;
+  //     gpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]->mDescribe->mContent->dims[1].stride  = 85*34;
+
+  //     Tensor::copydim(gpu_iter->mInfo.second[5].executeBuffer.command[0]->workInputs[i], gpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+  //     Tensor::copydim(gpu_iter->mInfo.second[6].executeBuffer.command[0]->workInputs[i], gpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+
+  //     Tensor::copydim(gpu_iter->mInfo.second[5].executeBuffer.command[0]->workOutputs[i], gpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+  //     Tensor::copydim(gpu_iter->mInfo.second[6].executeBuffer.command[0]->workOutputs[i], gpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+
+
+
+  //     Tensor::copydim(cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i], part1);
+
+
+  //     cpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]->mDescribe->mContent->dims[2].extent  =   cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->mDescribe->mContent->dims[2].extent;
+  //     cpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]->mDescribe->mContent->dims[0].stride  = 85*51*96;
+  //     cpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]->mDescribe->mContent->dims[1].stride  = 85*51;
+
+  //     Tensor::copydim(cpu_iter->mInfo.second[5].executeBuffer.command[0]->workInputs[i], cpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+  //     Tensor::copydim(cpu_iter->mInfo.second[6].executeBuffer.command[0]->workInputs[i], cpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+
+  //     Tensor::copydim(cpu_iter->mInfo.second[5].executeBuffer.command[0]->workOutputs[i], cpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+  //     Tensor::copydim(cpu_iter->mInfo.second[6].executeBuffer.command[0]->workOutputs[i], cpu_iter->mInfo.second[4].executeBuffer.command[0]->workOutputs[i]);
+
+
+  //     cpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->copyFromHostTensor(part1);
+  //     gpu_iter->mInfo.second[4].executeBuffer.command[0]->workInputs[i]->copyFromHostTensor(part0);
+
+  // }
+  
+  //   auto cmd = gpu_iter->mInfo.second[4].executeBuffer.command[0];
+  //   auto future = std::async(std::launch::async,[&](){
+  //   for(int i = 4; i < 7;i++)
+  //   {
+  //     cmd = gpu_iter->mInfo.second[i].executeBuffer.command[0];
+  //       cmd->execution->onResize(cmd->workInputs,cmd->workOutputs);
+  //       cmd->execution->onExecute(cmd->workInputs,cmd->workOutputs);
+  //       cmd->execution->backend()->onSync(Tensor::MAP_TENSOR_READ,true,NULL);
+  //   }
+
+  //     MNN_PRINT("GPU done\n");
+  //     return 0;
+  //   });
+
+
+  //   //run cpu
+
+  //   auto cmd2 = cpu_iter->mInfo.second[4].executeBuffer.command[0];
+  //   for(int  i = 4; i < 7; i++)
+  //   {
+  //       cmd2 = cpu_iter->mInfo.second[i].executeBuffer.command[0];
+  //       mBackend_cpu->onResizeBegin();
+  //       cmd2->execution->onResize(cmd2->workInputs,cmd2->workOutputs);
+  //       mBackend_cpu->onResizeEnd();
+  //       cmd2->execution->onExecute(cmd2->workInputs,cmd2->workOutputs) ;
+  //   }
+
+  //   MNN_PRINT("CPU done\n");
+
+  //   // // wait 
+  //   future.get();
+  
+  //   Tensor * hostcpu;
+  //   hostcpu = Tensor::createHostTensorFromDevice(cmd2->workOutputs[0],true);
+
+    
+  //   Tensor *hostgpu;
+  //   hostgpu = Tensor::createHostTensorFromDevice(cmd->workOutputs[0],true);
+
+  //   Tensor::merge(synch,hostgpu,hostcpu,0);
+  
+
+  //    gpu_iter->mInfo.second[7].executeBuffer.command[0]->workInputs[0]->copyFromHostTensor(synch);
+
+  //   for (int i = 7; i < len; i++) {
+  //     auto &buffer = gpu_iter->mInfo.second[i].executeBuffer;
+
+  //     for (auto &cmdP : buffer.command) {
+  //       auto &cmd = *cmdP;
+  //       auto code = cmd.execution->onExecute(cmd.workInputs, cmd.workOutputs);
+
+  //       if (NO_ERROR != code) {
+  //         mBackend_gpu->onExecuteEnd();
+  //         return code;
+  //       }
+  //     }
+  //   }
+   
+
+    mBackend_cpu->onExecuteEnd();
+    mBackend_gpu->onExecuteEnd();
+    return NO_ERROR;
 }
 
 Tensor *Interpreter::getSessionInput(const Session *session, const char *name) {
@@ -859,11 +981,11 @@ static void _getDefaultBackend(RuntimeInfo &rt) {
 }
 RuntimeInfo
 Interpreter::createRuntime(const std::vector<ScheduleConfig> &configs) {
-  RuntimeInfo res;
-  auto &mRuntimes = res.first;
+  RuntimeInfo res; //std::pair<std::map<MNNForwardType, std::shared_ptr<Runtime>>,     std::shared_ptr<Runtime>>
+  auto &mRuntimes = res.first; // std::map<MNNForwardType, std::shared_ptr<Runtime>
   for (auto &config : configs) {
-    Backend::Info compute;
-    compute.type = Schedule::getApprociateType(config);
+    Backend::Info compute;  //info used to create backend
+    compute.type = Schedule::getApprociateType(config);  //ScheduleConfig config的信息如  MNNForwardType以及numThread 穿给Backend
     compute.numThread = config.numThread;
     if (config.type == MNN_FORWARD_AUTO) {
       if (compute.type == MNN_FORWARD_OPENCL ||
@@ -872,19 +994,19 @@ Interpreter::createRuntime(const std::vector<ScheduleConfig> &configs) {
         compute.numThread = 16;
       }
     }
-    compute.user = config.backendConfig;
+    compute.user = config.backendConfig;  //ScheduleConfig config中用户自定义信息如PowerMode 等
     if (mRuntimes.find(compute.type) == mRuntimes.end()) {
-      auto newBn = RuntimeFactory::create(compute);
+      auto newBn = RuntimeFactory::create(compute); //创建后端 如CPU，opencl 等后端
       if (nullptr == newBn) {
         MNN_ERROR("Can't create Runtime: %s\n",
                   EnumNameForwardType((ForwardType)compute.type));
         continue;
       }
-      mRuntimes[compute.type].reset(newBn);
+      mRuntimes[compute.type].reset(newBn);  //将新的 初始化好的backend 给mRuntimes中的Runtime
     }
   }
-  _getDefaultBackend(res);
-  return res;
+  _getDefaultBackend(res); // res->second 再添加一个cpu runtime 猜想备用？
+  return res; //RuntimeInfo
 }
 void Interpreter::destroy(Interpreter *net) {
   if (nullptr != net) {

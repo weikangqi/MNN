@@ -31,6 +31,10 @@ list(APPEND MNN_EXEC_DEMOS transformerDemo.out)
 add_executable(nluDemo.out ${CMAKE_CURRENT_LIST_DIR}/nluDemo.cpp)
 list(APPEND MNN_EXEC_DEMOS nluDemo.out)
 
+add_executable(hello.out ${CMAKE_CURRENT_LIST_DIR}/hello.cpp)
+list(APPEND MNN_EXEC_DEMOS hello.out)
+
+
 foreach(TARGET ${MNN_EXEC_DEMOS})
     target_link_libraries(${TARGET} ${MNN_DEPS})
     if (MSVC)

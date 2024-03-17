@@ -180,7 +180,7 @@ ErrorCode Session::resize() {
     if (mNeedResize) {
         bool debug = mCallBackMode == Interpreter::Session_Debug;
         for (auto& iter : mPipelines) {
-            auto error = iter->encode(debug, permitCodegen);
+            auto error = iter->encode(debug, permitCodegen);  //这个里面 主要是计算了 tensor的dim ，以及量化的一些信息
             if (NO_ERROR != error) {
                 return error;
             }
@@ -199,7 +199,7 @@ ErrorCode Session::resize() {
             forbidReplace = true;
         }
         for (auto& iter : mPipelines) {
-            auto error = iter->allocMemory(firstMalloc, forbidReplace);
+            auto error = iter->allocMemory(firstMalloc, forbidReplace);  //分配实际的内存 
             if (NO_ERROR != error) {
                 return error;
             }

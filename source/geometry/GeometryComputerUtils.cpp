@@ -172,7 +172,7 @@ ErrorCode GeometryComputerUtils::shapeComputeAndGeometryTransform(
                 }
             }
         }
-        if (!skipShapeCompute) {
+        if (!skipShapeCompute) {            //由于输入的dim 是变的 这个时候计算各层的Tensor的大小
             auto res = SizeComputer::computeOutputSize(info.op, info.inputs, info.outputs);
             if (!res) {
                 if (info.op->name() != nullptr) {
@@ -188,8 +188,8 @@ ErrorCode GeometryComputerUtils::shapeComputeAndGeometryTransform(
              Because of old code, we will acces dim[2] / dim[3] to get width and height
              Set the lenght to 1 for compability
              */
-            for (auto t : info.outputs) {
-                TensorUtils::adjustTensorForCompability(t);
+            for (auto t : info.outputs) {     
+                TensorUtils::adjustTensorForCompability(t);  //设置Tersor的 dim
             }
         }
 

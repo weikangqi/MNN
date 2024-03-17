@@ -133,10 +133,14 @@ public:
 
     Tensor* getTensor(int index) const;
     Schedule::PipelineInfo& getPipelineInfo(int index) const;
+
+
+
 protected:
     const std::vector<std::shared_ptr<Pipeline>>& getPipelines() const {
         return this->mPipelines;
     }
+
 
 private:
     void _clearCache();
